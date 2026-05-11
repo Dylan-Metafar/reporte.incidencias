@@ -49,8 +49,14 @@ def identificar_cancelaciones(df_vtex, df_skus_error, umbral_pct):
 # --- INTERFAZ ---
 st.title("Identificador de órdenes a cancelar")
 
-password = st.text_input("Contraseña", type="password")
-if password != "Metafar2026!":
+# Buscamos la contraseña en los Secrets de Streamlit
+password_correcta = st.secrets["password"]
+
+password_usuario = st.text_input("Introduce la contraseña para acceder", type="password")
+
+if password_usuario != password_correcta:
+    if password_usuario != "": # Solo muestra el error si ya escribió algo
+        st.error("Contraseña incorrecta")
     st.stop()
 
 st.sidebar.header("Configuración")
