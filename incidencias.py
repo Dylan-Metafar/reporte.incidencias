@@ -39,8 +39,10 @@ def identificar_cancelaciones(df_vtex, df_skus_error, umbral_pct):
 
 import streamlit as st
 
-st.set_page_config(page_title="Identificador de cancelaciones", layout="wide")
-st.title("Identificador de Órdenes a Cancelar por SKUs Irrisorios")
+# Setear contraseña
+password = st.text_input("Introduce la contraseña para acceder", type="password")
+if password != "tu_clave_segura":
+    st.stop() # Detiene la ejecución si la clave es incorrecta
 
 # Barra lateral
 
