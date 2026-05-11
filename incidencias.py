@@ -2,20 +2,25 @@ import pandas as pd
 import streamlit as st
 
 def identificar_cancelaciones(df_vtex, df_skus_error, umbral_pct):
-    # 1. LIMPIEZA TOTAL DE COLUMNAS
-    # Pasamos todos los nombres de columnas a minúsculas y quitamos espacios
-    df_vtex.columns = [str(c).strip().lower() for c in df_vtex.columns]
-    df_skus_error.columns = [str(c).strip().lower() for c in df_skus_error.columns]
+    # 1. LIMPIEZA TOTAL DE COLUMNAS (Versión reforzada para BOM)
+    # Reemplazamos caracteres extraños y limpiamos nombres
+    df_vtex.columns = [
+        str(c).replace('ï»¿', '').strip().lower() 
+        for c in df_vtex.columns
+    ]
+    df_skus_error.columns = [
+        str(c).replace('ï»¿', '').strip().lower() 
+        for c in df_skus_error.columns
+    ]
 
     # 2. IDENTIFICACIÓN AUTOMÁTICA DE COLUMNAS
-    # Buscamos la columna que contenga 'order' o 'pedido'
-    col_orden_list = [c for c in df_vtex.columns if 'order' in c or 'pedido' in c]
-    # Buscamos la columna que contenga 'sku'
+    # Buscamos 'sku' y 'id' (que es lo que detectaste en tu archivo)
+    col_orden_list = [c for c in df_vtex.columns if 'id' in c or 'order' in c or 'pedido' in c]
     col_sku_vtex_list = [c for c in df_vtex.columns if 'sku' in c]
     col_sku_err_list = [c for c in df_skus_error.columns if 'sku' in c]
 
     if not col_orden_list or not col_sku_vtex_list or not col_sku_err_list:
-        st.error(f"No encontré las columnas necesarias. Columnas detectadas: {df_vtex.columns.tolist()}")
+        st.error(f"No encontré las columnas. Detecté: {df_vtex.columns.tolist()}")
         st.stop()
 
     col_orden = col_orden_list[0]
