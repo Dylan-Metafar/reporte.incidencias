@@ -27,10 +27,26 @@ def identificar_cancelaciones(df_vtex, df_skus_error, umbral_pct):
     col_sku = col_sku_vtex_list[0]
     col_sku_err = col_sku_err_list[0]
 
-    # 3. Normalización de datos (aseguramos texto)
-    df_vtex[col_orden] = df_vtex[col_orden].astype(str).str.strip()
-    df_vtex[col_sku] = df_vtex[col_sku].astype(str).str.strip()
-    df_skus_error[col_sku_err] = df_skus_error[col_sku_err].astype(str).str.strip()
+   # 3. Normalización de datos (Reforzada)
+    # Convertimos a string, quitamos espacios y removemos '.0' si Excel lo agregó
+    def limpiar_id(serie):
+        return serie.astype(str).str.strip().str.replace(r'\.0$', '', regex=True).str.lower()
+
+    df_vtex[col_orden] = limpiar_id(df_vtex[col_orden])
+    df_vtex[col_sku] = limpiar_id(df_vtex[col_sku])
+    df_skus_error[col_sku_err] = limpiar_id(df_skus_error[col_sku_err])
+
+    # --- BLOQUE DE DEBUG (Solo para que tú veas qué pasa) ---
+    st.write("### 🔍 Debug de cruce:")
+    primeros_skus_vtex = df_vtex[col_sku].unique()[:5]
+    primeros_skus_error = list(df_skus_error[col_sku_err].unique())[:5]
+    st.write(f"Ejemplos SKUs en VTEX: {primeros_skus_vtex}")
+    st.write(f"Ejemplos SKUs en Errores: {primeros_skus_error}")
+    # -------------------------------------------------------
+
+    # 4. Identificar qué órdenes tienen SKUs irrisorios
+    set_errores = set(df_skus_error[col_sku_err])
+    df_vtex['es_irrisorio'] = df_vtex[col_sku].apply(lambda x: x in set_errores)
 
     # 4. Identificar qué órdenes tienen SKUs irrisorios
     # Usamos un 'set' para que la búsqueda sea ultra rápida
