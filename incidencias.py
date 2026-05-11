@@ -59,8 +59,15 @@ with col2:
 # Procesamiento
 
 if file_vtex and file_skus_error:
-    df_vtex = pd.read_csv(file_vtex)
-    df_skus_error = pd.read_csv(file_skus_error)
+    try:
+        df_vtex = pd.read_csv(file_vtex, sep=None, engine='python', encoding='latin-1')
+    except Exception:
+        df_vtex = pd.read_csv(file_vtex, sep=None, engine='python', encoding='utf-8')
+
+    try:
+        df_skus_error = pd.read_csv(file_skus_error, sep=None, engine='python', encoding='latin-1')
+    except Exception:
+        df_skus_error = pd.read_csv(file_skus_error, sep=None, engine='python', encoding='utf-8')
 
     if st.button("Identificar Órdenes a Cancelar"):
         with st.spinner("Procesando datos..."):
