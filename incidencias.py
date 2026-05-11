@@ -41,7 +41,7 @@ import streamlit as st
 
 # Setear contraseña
 password = st.text_input("Introduce la contraseña para acceder", type="password")
-if password != "tu_clave_segura":
+if password != "Metafar2026!":
     st.stop() # Detiene la ejecución si la clave es incorrecta
 
 # Barra lateral
