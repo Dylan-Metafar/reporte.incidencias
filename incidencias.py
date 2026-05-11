@@ -44,10 +44,10 @@ def identificar_cancelaciones(df_vtex, df_skus_error, umbral_pct):
     # 7. Formato
     resultado['porcentaje_error'] = resultado['porcentaje_error'].round(2).astype(str) + '%'
     
-    return resultado.sort_values(by='total_items', ascending=False)
+    return resultado.sort_values(by='porcentaje_error', ascending=False)
 
 # --- INTERFAZ ---
-st.title("🛡️ Validador de Órdenes (Excel Edition)")
+st.title("Identificador de órdenes a cancelar")
 
 password = st.text_input("Contraseña", type="password")
 if password != "Metafar2026!":
