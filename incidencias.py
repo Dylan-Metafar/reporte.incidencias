@@ -10,11 +10,11 @@ def identificar_cancelaciones(df_vtex, df_skus_error, umbral_pct):
     # 1. Normalización de datos (aseguramos que SKU y Orden sean texto y no tengan espacios)
     # Ajustar nombres de columnas según el reporte real ('order_id' y 'sku_id')
     df_vtex['order'] = df_vtex['order'].astype(str).str.strip()
-    df_vtex['SKU_ID'] = df_vtex['ID_SKU'].astype(str).str.strip()
+    df_vtex['SKU_ID'] = df_vtex['SKU_ID'].astype(str).str.strip()
     df_skus_error['SKU_ID'] = df_skus_error['SKU_ID'].astype(str).str.strip()
 
     # 2. Identificar qué órdenes tienen SKUs irrisorios
-    set_errores = df_skus_error[''SKU_ID'']
+    set_errores = df_skus_error['SKU_ID']
     df_vtex['es_irrisorio'] = df_vtex['SKU_ID'].apply(lambda x: x in set_errores)
 
     # 3. Agrupar por order para calcular el porcentaje de SKUs irrisorios por orden
