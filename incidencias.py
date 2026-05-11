@@ -2,119 +2,78 @@ import pandas as pd
 import streamlit as st
 
 def identificar_cancelaciones(df_vtex, df_skus_error, umbral_pct):
-    # 1. LIMPIEZA TOTAL DE COLUMNAS (Versión reforzada para BOM)
-    # Reemplazamos caracteres extraños y limpiamos nombres
-    df_vtex.columns = [
-        str(c).replace('ï»¿', '').strip().lower() 
-        for c in df_vtex.columns
-    ]
-    df_skus_error.columns = [
-        str(c).replace('ï»¿', '').strip().lower() 
-        for c in df_skus_error.columns
-    ]
+    # 1. Normalización de nombres de columnas (por seguridad)
+    df_vtex.columns = [str(c).strip().lower() for c in df_vtex.columns]
+    df_skus_error.columns = [str(c).strip().lower() for c in df_skus_error.columns]
 
-    # 2. IDENTIFICACIÓN AUTOMÁTICA DE COLUMNAS
-    # Buscamos 'sku' y 'id' (que es lo que detectaste en tu archivo)
-    col_orden_list = [c for c in df_vtex.columns if 'id' in c or 'order' in c or 'pedido' in c]
-    col_sku_vtex_list = [c for c in df_vtex.columns if 'sku' in c]
-    col_sku_err_list = [c for c in df_skus_error.columns if 'sku' in c]
+    # 2. Definición de nombres (según lo que acordaste con las chicas)
+    col_orden = 'order'
+    col_sku = 'id_sku'
 
-    if not col_orden_list or not col_sku_vtex_list or not col_sku_err_list:
-        st.error(f"No encontré las columnas. Detecté: {df_vtex.columns.tolist()}")
+    # Validar que existan
+    if col_orden not in df_vtex.columns or col_sku not in df_vtex.columns:
+        st.error(f"El archivo de pedidos debe tener la columna '{col_orden}' y '{col_sku}'.")
+        st.stop()
+    
+    if col_sku not in df_skus_error.columns:
+        st.error(f"El archivo de errores debe tener la columna '{col_sku}'.")
         st.stop()
 
-    col_orden = col_orden_list[0]
-    col_sku = col_sku_vtex_list[0]
-    col_sku_err = col_sku_err_list[0]
+    # 3. Limpieza de datos (Quitar espacios, .0 de Excel y pasar a string)
+    def limpiar_texto(serie):
+        return serie.astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
 
-   # 3. Normalización de datos (Reforzada)
-    # Convertimos a string, quitamos espacios y removemos '.0' si Excel lo agregó
-    def limpiar_id(serie):
-        return serie.astype(str).str.strip().str.replace(r'\.0$', '', regex=True).str.lower()
+    df_vtex[col_orden] = limpiar_texto(df_vtex[col_orden])
+    df_vtex[col_sku] = limpiar_texto(df_vtex[col_sku])
+    df_skus_error[col_sku] = limpiar_texto(df_skus_error[col_sku])
 
-    df_vtex[col_orden] = limpiar_id(df_vtex[col_orden])
-    df_vtex[col_sku] = limpiar_id(df_vtex[col_sku])
-    df_skus_error[col_sku_err] = limpiar_id(df_skus_error[col_sku_err])
+    # 4. Cruce de datos
+    set_errores = set(df_skus_error[col_sku])
+    df_vtex['es_error'] = df_vtex[col_sku].apply(lambda x: x in set_errores)
 
-    # --- BLOQUE DE DEBUG (Solo para que tú veas qué pasa) ---
-    st.write("### 🔍 Debug de cruce:")
-    primeros_skus_vtex = df_vtex[col_sku].unique()[:5]
-    primeros_skus_error = list(df_skus_error[col_sku_err].unique())[:5]
-    st.write(f"Ejemplos SKUs en VTEX: {primeros_skus_vtex}")
-    st.write(f"Ejemplos SKUs en Errores: {primeros_skus_error}")
-    # -------------------------------------------------------
-
-    # 4. Identificar qué órdenes tienen SKUs irrisorios
-    set_errores = set(df_skus_error[col_sku_err])
-    df_vtex['es_irrisorio'] = df_vtex[col_sku].apply(lambda x: x in set_errores)
-
-    # 4. Identificar qué órdenes tienen SKUs irrisorios
-    # Usamos un 'set' para que la búsqueda sea ultra rápida
-    set_errores = set(df_skus_error[col_sku_err])
-    df_vtex['es_irrisorio'] = df_vtex[col_sku].apply(lambda x: x in set_errores)
-
-    # 5. Agrupar por orden
+    # 5. Agrupación por orden
     resumen = df_vtex.groupby(col_orden).agg(
-        total_skus=(col_sku, 'count'),
-        skus_irrisorios=('es_irrisorio', 'sum')
+        total_items=(col_sku, 'count'),
+        items_con_error=('es_error', 'sum')
     ).reset_index()
 
-    # 6. Calcular el porcentaje
-    resumen['pct_irrisorio'] = (resumen['skus_irrisorios'] / resumen['total_skus']) * 100
+    # 6. Cálculo y Filtro
+    resumen['porcentaje_error'] = (resumen['items_con_error'] / resumen['total_items']) * 100
+    resultado = resumen[resumen['porcentaje_error'] >= umbral_pct].copy()
+    
+    # 7. Formato final
+    resultado['porcentaje_error'] = resultado['porcentaje_error'].round(2).astype(str) + '%'
+    
+    return resultado.sort_values(by='total_items', ascending=False)
 
-    # 7. Filtrar órdenes según umbral
-    ordenes_a_cancelar = resumen[resumen['pct_irrisorio'] >= umbral_pct].copy()
+# --- INTERFAZ STREAMLIT ---
+st.title("🛡️ Validador de Órdenes Críticas")
 
-    # 8. Formatear el output
-    if not ordenes_a_cancelar.empty:
-        ordenes_a_cancelar['pct_irrisorio'] = ordenes_a_cancelar['pct_irrisorio'].round(2).astype(str) + '%'
-        return ordenes_a_cancelar.sort_values(by='total_skus', ascending=False)
-    else:
-        return pd.DataFrame(columns=[col_orden, 'total_skus', 'skus_irrisorios', 'pct_irrisorio'])
-
-# --- INTERFAZ DE STREAMLIT ---
-
-# Setear contraseña
-password = st.text_input("Introduce la contraseña para acceder", type="password")
+# Login simple
+password = st.text_input("Contraseña", type="password")
 if password != "Metafar2026!":
     st.stop()
 
-# Barra lateral
 st.sidebar.header("Configuración")
-umbral = st.sidebar.slider("Umbral de SKUs Irrisorios (%)", min_value=0, max_value=100, value=50, step=5)
+umbral = st.sidebar.slider("Umbral de error (%)", 0, 100, 50)
 
-# Carga de archivos
+# Inputs
 col1, col2 = st.columns(2)
 with col1:
-    file_vtex = st.file_uploader("Carga el reporte de VTEX (CSV)", type=["csv"])
+    f1 = st.file_uploader("CSV de Pedidos (columnas: order, id_sku)", type="csv")
 with col2:
-    file_skus_error = st.file_uploader("Carga el listado de SKUs irrisorios (CSV)", type=["csv"])
+    f2 = st.file_uploader("CSV de Errores (columna: id_sku)", type="csv")
 
-if file_vtex and file_skus_error:
-    # Función para leer CSV con manejo de errores de formato
-    def safe_read(file):
-        try:
-            return pd.read_csv(file, sep=None, engine='python', encoding='latin-1')
-        except:
-            return pd.read_csv(file, sep=None, engine='python', encoding='utf-8')
+if f1 and f2:
+    # Lectura simple
+    df1 = pd.read_csv(f1, sep=None, engine='python', encoding='latin-1')
+    df2 = pd.read_csv(f2, sep=None, engine='python', encoding='latin-1')
 
-    df_vtex_raw = safe_read(file_vtex)
-    df_skus_error_raw = safe_read(file_skus_error)
-
-    if st.button("Identificar Órdenes a Cancelar"):
-        with st.spinner("Procesando datos..."):
-            resultado = identificar_cancelaciones(df_vtex_raw, df_skus_error_raw, umbral)
-        
-        if not resultado.empty:
-            st.success(f"Identificación completada. Se encontraron {len(resultado)} órdenes.")
-            st.dataframe(resultado, use_container_width=True)
-
-            csv = resultado.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="Descargar resultado como CSV",
-                data=csv,
-                file_name='ordenes_a_cancelar.csv',
-                mime='text/csv',
-            )
+    if st.button("Procesar"):
+        res = identificar_cancelaciones(df1, df2, umbral)
+        if not res.empty:
+            st.success(f"Se encontraron {len(res)} órdenes.")
+            st.dataframe(res, use_container_width=True)
+            st.download_button("Descargar CSV", res.to_csv(index=False), "cancelar.csv")
         else:
-            st.warning("No se encontraron órdenes que cumplan con el umbral seleccionado.")
+            st.warning("No hay órdenes que superen el umbral.")
